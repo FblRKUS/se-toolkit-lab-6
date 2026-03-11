@@ -93,9 +93,13 @@ A senior engineer explains the assignment:
 
 ### Task 1 — <Title>
 
-**Purpose:** <one sentence>
+**Purpose:**
 
-<Summary — 2 to 4 sentences>
+<one sentence>
+
+**Summary:**
+
+<two to four paragraphs, five to ten sentences total>
 
 **Acceptance criteria:**
 
@@ -107,9 +111,13 @@ A senior engineer explains the assignment:
 
 ### Task 2 — <Title>
 
-**Purpose:** <one sentence>
+**Purpose:**
 
-<Summary>
+<one sentence>
+
+**Summary:**
+
+<two to four paragraphs>
 
 **Acceptance criteria:**
 
@@ -119,9 +127,13 @@ A senior engineer explains the assignment:
 
 ### Task 3 — <Title>
 
-**Purpose:** <one sentence>
+**Purpose:**
 
-<Summary>
+<one sentence>
+
+**Summary:**
+
+<two to four paragraphs>
 
 **Acceptance criteria:**
 
@@ -133,9 +145,13 @@ A senior engineer explains the assignment:
 
 ### Task 1 — <Title>
 
-**Purpose:** <one sentence>
+**Purpose:**
 
-<Summary>
+<one sentence>
+
+**Summary:**
+
+<two to four paragraphs>
 
 **Acceptance criteria:**
 
@@ -213,7 +229,7 @@ For lab story conventions shared with the README (tone, blockquote style, cross-
 
 ## 8. Task descriptions
 
-The lab plan contains exactly three required tasks and one optional task.
+The lab plan contains exactly three required tasks and one optional task. Each task has three titled sections — `**Purpose:**`, `**Summary:**`, and `**Acceptance criteria:**` — each on its own line with the content starting on the next line.
 
 ### 8.1. Required tasks
 
@@ -231,11 +247,11 @@ Optional tasks must be independent — completable without depending on other op
 
 ### 8.3. Purpose statement
 
-Each task includes a `**Purpose:**` line containing exactly one sentence that explains why the task matters — what the student will learn or achieve.
+Each task includes a `**Purpose:**` section heading followed by exactly one sentence on the next line that explains why the task matters — what the student will learn or achieve.
 
 ### 8.4. Summary
 
-Each task includes a summary paragraph of four to seven sentences describing what the student does. The summary should be specific enough to guide task file creation but not so detailed that it prescribes every step.
+Each task includes a `**Summary:**` section heading followed by five to ten sentences split across two to four short paragraphs describing what the student does. Break on natural topic boundaries — for example, put setup and exploration in one paragraph and implementation details in the next. The summary should be specific enough to guide task file creation but not so detailed that it prescribes every step.
 
 ### 8.5. Acceptance criteria
 
@@ -312,7 +328,7 @@ Severity guide:
 - Are there four to six learning outcomes?
 - Does the "In simple words" list match outcomes one-to-one?
 - Are purpose statements exactly one sentence?
-- Are summaries four to seven sentences?
+- Are summaries five to ten sentences split across two to four paragraphs?
 - Are `---` rules present between tasks?
 
 ### 10.8. D8. Practical feasibility
@@ -355,7 +371,7 @@ Severity guide:
 - [ ] Required tasks build on each other sequentially.
 - [ ] The optional task is independent.
 - [ ] Each task has a one-sentence `**Purpose:**`.
-- [ ] Each task has a four-to-seven-sentence summary.
+- [ ] Each task has a summary of five to ten sentences split across two to four paragraphs.
 - [ ] Each task has three to five concrete, verifiable acceptance criteria.
 - [ ] Acceptance criteria use plain bullets (`-`), not checkboxes (`- [ ]`).
 - [ ] `---` rules separate tasks within a section.
