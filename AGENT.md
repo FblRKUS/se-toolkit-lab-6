@@ -153,7 +153,168 @@ Run tests:
 uv run pytest tests/test_task1.py -v
 ```
 
+## Task 2: The Documentation Agent
+
+### Overview
+
+Task 2 extends the agent with tool-calling capabilities, enabling it to read project documentation and provide answers with source references.
+
+### New Capabilities
+
+1. **Two Tools**: `read_file` and `list_files` for navigating the wiki directory
+2. **Agentic Loop**: LLM decides which tools to call, we execute them, feed results back
+3. **Source Tracking**: Extract and include wiki file references in answers
+4. **Tool Call History**: Record all tool calls in the JSON output
+
+### Tools
+
+#### `read_file(path: str) -> str`
+
+Reads a file from the project repository.
+
+**Parameters**:
+- `path` (string) - Relative path from project root (e.g., `wiki/git-workflow.md`)
+
+**Returns**: File contents as string, or error message if file doesn't exist
+
+**Security**: 
+- Validates path doesn't escape project directory (no `../` traversal)
+- Uses `os.path.abspath()` and `startswith()` to ensure path is within project
+- Returns error message for paths outside project root
+
+**Example**:
+```python
+read_file("wiki/git-workflow.md")
+# Returns: "# Git Workflow\n\n## Resolving merge conflicts..."
+```
+
+#### `list_files(path: str) -> str`
+
+Lists files and directories at a given path.
+
+**Parameters**:
+- `path` (string) - Relative directory path from project root (e.g., `wiki`)
+
+**Returns**: Newline-separated list of entries
+
+**Security**: Same path validation as `read_file`
+
+**Example**:
+```python
+list_files("wiki")
+# Returns: "api.md\narchitecture.md\ngit-workflow.md\n..."
+```
+
+### Agentic Loop
+
+The agentic loop is the core of the documentation agent:
+
+```
+1. Send question + tool schemas to LLM
+   ↓
+2. LLM response contains tool_calls?
+   ↓
+   YES → Execute each tool
+      → Append results as 'tool' role messages
+      → Add to conversation history
+      → Go to step 1 (max 10 iterations)
+   ↓
+   NO → Extract final answer
+      → Parse source reference from answer
+      → Output JSON and exit
+```
+
+**Key Features**:
+- Maximum 10 iterations to prevent infinite loops
+- Tools are executed sequentially within each iteration
+- Tool results are fed back to the LLM for reasoning
+- Loop terminates when LLM provides a final answer (no tool calls)
+
+**Implementation**: `agentic_loop()` function in `agent.py`
+
+### System Prompt Strategy
+
+Updated system prompt guides the LLM in using tools effectively:
+
+```
+You are a helpful documentation assistant for a software engineering project.
+
+Your task is to answer questions about the project by reading the documentation 
+in the wiki/ directory.
+
+Follow these steps:
+1. Use list_files to discover what documentation files are available in wiki/
+2. Use read_file to read relevant documentation files
+3. Provide a concise answer based on the documentation
+4. Include a source reference in the format: wiki/filename.md#section-anchor
+
+When citing sources:
+- Always reference the specific wiki file that contains the answer
+- Include a section anchor when possible (e.g., #resolving-merge-conflicts)
+- Format: wiki/filename.md#section-anchor or just wiki/filename.md
+```
+
+### Source Extraction
+
+The agent extracts source references from the LLM's final answer using regex:
+
+```python
+def extract_source(answer: str) -> str:
+    # Look for wiki/filename.md or wiki/filename.md#section patterns
+    match = re.search(r'wiki/[\w-]+\.md(?:#[\w-]+)?', answer)
+    return match.group(0) if match else "unknown"
+```
+
+### Updated Output Format
+
+```json
+{
+  "answer": "Edit the conflicting file, choose which changes to keep...",
+  "source": "wiki/git-workflow.md#resolving-merge-conflicts",
+  "tool_calls": [
+    {
+      "tool": "list_files",
+      "args": {"path": "wiki"},
+      "result": "git-workflow.md\nautochecker.md\n..."
+    },
+    {
+      "tool": "read_file",
+      "args": {"path": "wiki/git-workflow.md"},
+      "result": "# Git Workflow\n\n## Resolving merge conflicts..."
+    }
+  ]
+}
+```
+
+**Fields**:
+- `answer` - LLM's final answer based on documentation
+- `source` - Wiki file reference (e.g., `wiki/file.md#section`)
+- `tool_calls` - Array of all tool calls made during the agentic loop
+
+### Usage Examples
+
+**List files in wiki**:
+```bash
+uv run agent.py "What files are in the wiki?"
+```
+
+**Documentation question**:
+```bash
+uv run agent.py "How do you resolve a merge conflict?"
+```
+
+### Testing
+
+Tests for Task 2 in `tests/test_task2.py`:
+
+1. **Documentation question test**: Verifies agent uses `read_file` and extracts correct source
+2. **List files test**: Verifies agent uses `list_files` and returns wiki contents
+
+Run tests:
+```bash
+uv run pytest tests/test_task2.py -v
+```
+
 ## Future Tasks
 
-- **Task 2**: Add tool calling capability (populate `tool_calls` array)
-- **Task 3**: Implement agentic loop with tool execution
+- **Task 3**: Add backend API querying with `query_api` tool
