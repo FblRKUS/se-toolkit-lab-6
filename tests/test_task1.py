@@ -31,13 +31,14 @@ def test_agent_basic_question():
         raise AssertionError(f"Invalid JSON output: {e}")
     
     assert 'answer' in output, "Missing 'answer' field in output"
+    assert 'source' in output, "Missing 'source' field in output"
     assert 'tool_calls' in output, "Missing 'tool_calls' field in output"
     
     assert isinstance(output['answer'], str), "'answer' must be a string"
     assert len(output['answer']) > 0, "'answer' cannot be empty"
     
+    assert isinstance(output['source'], str), "'source' must be a string"
     assert isinstance(output['tool_calls'], list), "'tool_calls' must be a list"
-    assert len(output['tool_calls']) == 0, "'tool_calls' should be empty in Task 1"
 
 
 def test_agent_different_question():
@@ -54,10 +55,11 @@ def test_agent_different_question():
     output = json.loads(result.stdout.strip())
     
     assert 'answer' in output
+    assert 'source' in output
     assert 'tool_calls' in output
     assert isinstance(output['answer'], str)
     assert len(output['answer']) > 0
-    assert output['tool_calls'] == []
+    assert isinstance(output['tool_calls'], list)
 
 
 def test_agent_no_question_provided():
