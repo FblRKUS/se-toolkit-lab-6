@@ -312,9 +312,19 @@ Tests for Task 2 in `tests/test_task2.py`:
 
 Run tests:
 ```bash
-uv run pytest tests/test_task2.py -v
+uv run pytest tests/test_task3.py -v
 ```
+
+### Lessons Learned
+
+**Tool Description Quality Matters**: The LLM's tool selection heavily depends on clear, specific tool descriptions. Vague descriptions lead to wrong tool choices.
+
+**Environment Variables Are Critical**: All configuration must come from environment variables. The autochecker uses different LLM providers and backend URLs during evaluation.
+
+**Multi-step Reasoning Works**: The agentic loop successfully chains tools - querying an API to see an error, then reading source code to diagnose the bug. Max 10 iterations prevents infinite loops.
+
+**SSL Verification**: Disabled SSL verification (`verify=False`) for local development to avoid certificate issues with localhost. Production deployments should enable proper SSL.
 
 ## Future Tasks
 
-- **Task 3**: Add backend API querying with `query_api` tool
+- **Task 4**: Add support for user authentication and authorization
