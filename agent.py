@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Agent CLI - Tasks 1-2: LLM Agent with Tool Calling
+Agent CLI - Tasks 1-3: LLM Agent with Tool Calling
 
 Task 1: Basic LLM calling
 Task 2: Documentation agent with read_file and list_files tools
+Task 3: System agent with query_api tool for backend API queries
 
 Usage: uv run agent.py "Your question here"
 """
@@ -15,6 +16,7 @@ import re
 from typing import Dict, Any, List, Optional
 from openai import OpenAI
 from dotenv import load_dotenv
+import requests
 
 
 def parse_args() -> str:
@@ -39,29 +41,42 @@ def parse_args() -> str:
 
 
 def load_config() -> Dict[str, str]:
-    """Load LLM configuration from .env.agent.secret.
+    """Load configuration from environment files and variables.
     
     Returns:
-        dict: Configuration with api_key, api_base, model
+        dict: Configuration with LLM and backend API settings
         
     Exits:
         1 if configuration is missing or invalid
     """
+    # Load both env files (order matters - later ones override)
     load_dotenv('.env.agent.secret')
+    load_dotenv('.env.docker.secret')
     
+    # LLM configuration
     api_key = os.getenv('LLM_API_KEY')
     api_base = os.getenv('LLM_API_BASE')
     model = os.getenv('LLM_MODEL')
     
+    # Backend API configuration
+    lms_api_key = os.getenv('LMS_API_KEY')
+    agent_api_base_url = os.getenv('AGENT_API_BASE_URL', 'http://localhost:42002')
+    
+    # Validate required variables
     if not all([api_key, api_base, model]):
-        print("Error: Missing LLM configuration in .env.agent.secret", file=sys.stderr)
+        print("Error: Missing LLM configuration", file=sys.stderr)
         print("Required: LLM_API_KEY, LLM_API_BASE, LLM_MODEL", file=sys.stderr)
         sys.exit(1)
+    
+    if not lms_api_key:
+        print("Warning: LMS_API_KEY not set, query_api will not work", file=sys.stderr)
     
     return {
         'api_key': api_key,
         'api_base': api_base,
-        'model': model
+        'model': model,
+        'lms_api_key': lms_api_key,
+        'agent_api_base_url': agent_api_base_url
     }
 
 
@@ -125,6 +140,70 @@ def list_files(path: str) -> str:
         return f"Error listing directory: {e}"
 
 
+def query_api(method: str, path: str, body: Optional[str] = None) -> str:
+    """Query the backend API.
+    
+    Args:
+        method: HTTP method (GET, POST, etc.)
+        path: API endpoint path (e.g., /items/)
+        body: Optional JSON request body
+        
+    Returns:
+        JSON string with status_code and body
+    """
+    # Get configuration from environment
+    api_base_url = os.getenv('AGENT_API_BASE_URL', 'http://localhost:42002')
+    api_key = os.getenv('LMS_API_KEY')
+    
+    if not api_key:
+        return json.dumps({
+            "status_code": 0,
+            "body": "Error: LMS_API_KEY not set in environment"
+        })
+    
+    # Build full URL
+    url = api_base_url.rstrip('/') + path
+    
+    # Prepare headers
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    }
+    
+    try:
+        # Make request (disable SSL verification for local development)
+        response = requests.request(
+            method=method.upper(),
+            url=url,
+            headers=headers,
+            data=body,
+            timeout=30.0,
+            verify=False
+        )
+        
+        # Parse response body
+        try:
+            body_json = response.json()
+        except:
+            body_json = response.text
+        
+        return json.dumps({
+            "status_code": response.status_code,
+            "body": body_json
+        }, ensure_ascii=False)
+        
+    except requests.exceptions.ConnectionError:
+        return json.dumps({
+            "status_code": 0,
+            "body": f"Error: Cannot connect to {url}. Is the backend running?"
+        })
+    except Exception as e:
+        return json.dumps({
+            "status_code": 0,
+            "body": f"Error: {str(e)}"
+        })
+
+
 def get_tool_schemas() -> List[Dict[str, Any]]:
     """Get OpenAI function-calling schemas for available tools.
     
@@ -165,6 +244,32 @@ def get_tool_schemas() -> List[Dict[str, Any]]:
                     "required": ["path"]
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "query_api",
+                "description": "Query the deployed backend API to get system facts or data. Use this for questions about: framework, ports, database content, analytics, scores, items. Returns HTTP status code and response body.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "method": {
+                            "type": "string",
+                            "description": "HTTP method: GET, POST, PUT, DELETE",
+                            "enum": ["GET", "POST", "PUT", "DELETE"]
+                        },
+                        "path": {
+                            "type": "string",
+                            "description": "API endpoint path starting with /, e.g. '/items/' or '/analytics/completion-rate?lab=lab-04'"
+                        },
+                        "body": {
+                            "type": "string",
+                            "description": "Optional JSON request body for POST/PUT requests"
+                        }
+                    },
+                    "required": ["method", "path"]
+                }
+            }
         }
     ]
 
@@ -183,32 +288,59 @@ def execute_tool(tool_name: str, tool_args: Dict[str, Any]) -> str:
         return read_file(tool_args.get("path", ""))
     elif tool_name == "list_files":
         return list_files(tool_args.get("path", ""))
+    elif tool_name == "query_api":
+        return query_api(
+            method=tool_args.get("method", "GET"),
+            path=tool_args.get("path", "/"),
+            body=tool_args.get("body")
+        )
     else:
         return f"Error: Unknown tool: {tool_name}"
 
 
 def get_system_prompt() -> str:
-    """Get the system prompt for the documentation agent.
+    """Get the system prompt for the system agent.
     
     Returns:
         System prompt string
     """
-    return """You are a helpful documentation assistant for a software engineering project.
+    return """You are a helpful assistant for a software engineering project.
 
-Your task is to answer questions about the project by reading the documentation in the wiki/ directory.
+You have access to three types of tools:
 
-Follow these steps:
-1. Use list_files to discover what documentation files are available in the wiki/ directory
-2. Use read_file to read relevant documentation files
-3. Provide a concise answer based on the documentation
-4. Include a source reference in your final answer in the format: wiki/filename.md#section-anchor
+1. **query_api** - Query the deployed backend API
+   - Use for: system facts (framework, ports), database content (items, scores), analytics data
+   - Examples: "How many items?", "What framework?", "Get completion rate for lab-04"
+   
+2. **read_file** - Read files from the project repository
+   - Use for: source code inspection, configuration files, implementation details
+   - Examples: "Show the Item model", "Read docker-compose.yml", "Find the bug in routes.py"
+   
+3. **list_files** - List directory contents
+   - Use for: discovering available wiki documentation, exploring project structure
+   - Examples: "What wiki files exist?", "List files in backend/"
 
-When citing sources:
-- Always reference the specific wiki file that contains the answer
-- Include a section anchor when possible (e.g., #resolving-merge-conflicts)
-- Format: wiki/filename.md#section-anchor or just wiki/filename.md
+**Strategy for answering questions:**
 
-Be concise and accurate. Only use information from the project files."""
+1. **System/data questions** → Use query_api first
+   - "How many items?" → GET /items/ and count
+   - "What framework?" → GET /docs or read backend source code
+   - "Get analytics for lab-04" → GET /analytics/completion-rate?lab=lab-04
+
+2. **Documentation questions** → Use list_files + read_file
+   - "How to resolve merge conflicts?" → read wiki/git-workflow.md
+   - "How to set up Docker?" → read wiki/docker.md
+
+3. **Code/implementation questions** → Use read_file on source
+   - "Show the database model" → read backend/models.py
+   - "Find the bug in endpoint X" → read backend/routes/X.py
+
+4. **Multi-step questions** → Chain tools
+   - "Why does /analytics/X fail?" → query_api to see error → read_file to find bug
+
+Always include a source reference when answering from wiki (format: wiki/file.md#section).
+
+Be concise and accurate."""
 
 
 def extract_source(answer: str) -> str:
@@ -218,13 +350,14 @@ def extract_source(answer: str) -> str:
         answer: LLM's answer text
         
     Returns:
-        Source reference (e.g., wiki/file.md#section) or "unknown"
+        Source reference (e.g., wiki/file.md#section) or empty string
     """
     # Look for wiki/filename.md or wiki/filename.md#section patterns
     match = re.search(r'wiki/[\w-]+\.md(?:#[\w-]+)?', answer)
     if match:
         return match.group(0)
-    return "unknown"
+    # Source is optional for system questions
+    return ""
 
 
 def agentic_loop(question: str, api_key: str, api_base: str, model: str, max_iterations: int = 10) -> Dict[str, Any]:
